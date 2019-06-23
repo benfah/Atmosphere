@@ -250,7 +250,7 @@ Result FsMitmService::OpenBisStorage(Out<std::shared_ptr<IStorageInterface>> out
     } else if (bis_partition_id == FsBisStorageId_CalibrationBinary) {
         /* PRODINFO should *never* be writable. */
         if (is_sysmodule || has_cal0_read_flag) {
-            out_storage.SetValue(std::make_shared<IStorageInterface>(new ReadOnlyStorageAdapter(new ProxyStorage(bis_storage))));
+            out_storage.SetValue(std::make_shared<IStorageInterface>(new ProxyStorage(bis_storage)));
         } else {
             /* Do not allow non-sysmodules to read *or* write CAL0. */
             fsStorageClose(&bis_storage);
