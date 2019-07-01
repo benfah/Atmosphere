@@ -17,8 +17,7 @@
 #pragma once
 #include <switch.h>
 #include <stratosphere.hpp>
-
-#include "spl_types.hpp"
+#include <stratosphere/spl/spl_types.hpp>
 
 namespace sts::spl {
 
@@ -26,34 +25,36 @@ namespace sts::spl {
         protected:
             enum class CommandId {
                 /* 1.0.0+ */
-                GetConfig                   = 0,
-                ExpMod                      = 1,
-                GenerateAesKek              = 2,
-                LoadAesKey                  = 3,
-                GenerateAesKey              = 4,
-                SetConfig                   = 5,
-                GenerateRandomBytes         = 7,
-                ImportLotusKey              = 9,
-                DecryptLotusMessage         = 10,
-                IsDevelopment               = 11,
-                GenerateSpecificAesKey      = 12,
-                DecryptRsaPrivateKey        = 13,
-                DecryptAesKey               = 14,
-                CryptAesCtr                 = 15,
-                ComputeCmac                 = 16,
-                ImportEsKey                 = 17,
-                UnwrapTitleKey              = 18,
-                LoadTitleKey                = 19,
+                GetConfig                      = 0,
+                ExpMod                         = 1,
+                GenerateAesKek                 = 2,
+                LoadAesKey                     = 3,
+                GenerateAesKey                 = 4,
+                SetConfig                      = 5,
+                GenerateRandomBytes            = 7,
+                ImportLotusKey                 = 9,
+                DecryptLotusMessage            = 10,
+                IsDevelopment                  = 11,
+                GenerateSpecificAesKey         = 12,
+                DecryptRsaPrivateKeyDeprecated = 13,
+                DecryptRsaPrivateKey           = 13,
+                DecryptAesKey                  = 14,
+                CryptAesCtrDeprecated          = 15,
+                CryptAesCtr                    = 15,
+                ComputeCmac                    = 16,
+                ImportEsKey                    = 17,
+                UnwrapTitleKey                 = 18,
+                LoadTitleKey                   = 19,
 
                 /* 2.0.0+ */
-                UnwrapCommonTitleKey        = 20,
-                AllocateAesKeyslot          = 21,
-                FreeAesKeyslot              = 22,
-                GetAesKeyslotAvailableEvent = 23,
+                UnwrapCommonTitleKey           = 20,
+                AllocateAesKeyslot             = 21,
+                FreeAesKeyslot                 = 22,
+                GetAesKeyslotAvailableEvent    = 23,
 
                 /* 3.0.0+ */
-                SetBootReason               = 24,
-                GetBootReason               = 25,
+                SetBootReason                  = 24,
+                GetBootReason                  = 25,
             };
         public:
             DeprecatedService() { /* ... */ }
@@ -87,31 +88,31 @@ namespace sts::spl {
             virtual Result GetBootReason(Out<BootReasonValue> out);
         public:
             DEFINE_SERVICE_DISPATCH_TABLE {
-                MakeServiceCommandMeta<CommandId::GetConfig, &DeprecatedService::GetConfig>(),
-                MakeServiceCommandMeta<CommandId::ExpMod, &DeprecatedService::ExpMod>(),
-                MakeServiceCommandMeta<CommandId::GenerateAesKek, &DeprecatedService::GenerateAesKek>(),
-                MakeServiceCommandMeta<CommandId::LoadAesKey, &DeprecatedService::LoadAesKey>(),
-                MakeServiceCommandMeta<CommandId::GenerateAesKey, &DeprecatedService::GenerateAesKey>(),
-                MakeServiceCommandMeta<CommandId::SetConfig, &DeprecatedService::SetConfig>(),
-                MakeServiceCommandMeta<CommandId::GenerateRandomBytes, &DeprecatedService::GenerateRandomBytes>(),
-                MakeServiceCommandMeta<CommandId::ImportLotusKey, &DeprecatedService::ImportLotusKey>(),
-                MakeServiceCommandMeta<CommandId::DecryptLotusMessage, &DeprecatedService::DecryptLotusMessage>(),
-                MakeServiceCommandMeta<CommandId::IsDevelopment, &DeprecatedService::IsDevelopment>(),
-                MakeServiceCommandMeta<CommandId::GenerateSpecificAesKey, &DeprecatedService::GenerateSpecificAesKey>(),
-                MakeServiceCommandMeta<CommandId::DecryptRsaPrivateKey, &DeprecatedService::DecryptRsaPrivateKey>(),
-                MakeServiceCommandMeta<CommandId::DecryptAesKey, &DeprecatedService::DecryptAesKey>(),
-                MakeServiceCommandMeta<CommandId::CryptAesCtr, &DeprecatedService::CryptAesCtrDeprecated, FirmwareVersion_100, FirmwareVersion_100>(),
-                MakeServiceCommandMeta<CommandId::CryptAesCtr, &DeprecatedService::CryptAesCtr, FirmwareVersion_200>(),
-                MakeServiceCommandMeta<CommandId::ComputeCmac, &DeprecatedService::ComputeCmac>(),
-                MakeServiceCommandMeta<CommandId::ImportEsKey, &DeprecatedService::ImportEsKey>(),
-                MakeServiceCommandMeta<CommandId::UnwrapTitleKey, &DeprecatedService::UnwrapTitleKey>(),
-                MakeServiceCommandMeta<CommandId::LoadTitleKey, &DeprecatedService::LoadTitleKey>(),
-                MakeServiceCommandMeta<CommandId::UnwrapCommonTitleKey, &DeprecatedService::UnwrapCommonTitleKey, FirmwareVersion_200>(),
-                MakeServiceCommandMeta<CommandId::AllocateAesKeyslot, &DeprecatedService::AllocateAesKeyslot, FirmwareVersion_200>(),
-                MakeServiceCommandMeta<CommandId::FreeAesKeyslot, &DeprecatedService::FreeAesKeyslot, FirmwareVersion_200>(),
-                MakeServiceCommandMeta<CommandId::GetAesKeyslotAvailableEvent, &DeprecatedService::GetAesKeyslotAvailableEvent, FirmwareVersion_200>(),
-                MakeServiceCommandMeta<CommandId::SetBootReason, &DeprecatedService::SetBootReason, FirmwareVersion_300>(),
-                MakeServiceCommandMeta<CommandId::GetBootReason, &DeprecatedService::GetBootReason, FirmwareVersion_300>(),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, GetConfig),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, ExpMod),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, GenerateAesKek),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, LoadAesKey),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, GenerateAesKey),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, SetConfig),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, GenerateRandomBytes),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, ImportLotusKey),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, DecryptLotusMessage),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, IsDevelopment),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, GenerateSpecificAesKey),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, DecryptRsaPrivateKey),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, DecryptAesKey),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, CryptAesCtrDeprecated,       FirmwareVersion_100, FirmwareVersion_100),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, CryptAesCtr,                 FirmwareVersion_200),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, ComputeCmac),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, ImportEsKey),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, UnwrapTitleKey),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, LoadTitleKey),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, UnwrapCommonTitleKey,        FirmwareVersion_200),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, AllocateAesKeyslot,          FirmwareVersion_200),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, FreeAesKeyslot,              FirmwareVersion_200),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, GetAesKeyslotAvailableEvent, FirmwareVersion_200),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, SetBootReason,               FirmwareVersion_300),
+                MAKE_SERVICE_COMMAND_META(DeprecatedService, GetBootReason,               FirmwareVersion_300),
             };
     };
 

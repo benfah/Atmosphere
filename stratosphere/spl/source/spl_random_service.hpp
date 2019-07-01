@@ -17,8 +17,7 @@
 #pragma once
 #include <switch.h>
 #include <stratosphere.hpp>
-
-#include "spl_types.hpp"
+#include <stratosphere/spl/spl_types.hpp>
 
 namespace sts::spl {
 
@@ -35,7 +34,7 @@ namespace sts::spl {
             virtual Result GenerateRandomBytes(OutBuffer<u8> out);
         public:
             DEFINE_SERVICE_DISPATCH_TABLE {
-                MakeServiceCommandMeta<CommandId::GenerateRandomBytes, &RandomService::GenerateRandomBytes>(),
+                MAKE_SERVICE_COMMAND_META(RandomService, GenerateRandomBytes),
             };
     };
 

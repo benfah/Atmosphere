@@ -17,7 +17,7 @@
 #pragma once
 #include <switch.h>
 #include <stratosphere.hpp>
-#include "sm_types.hpp"
+#include <stratosphere/sm.hpp>
 
 namespace sts::sm {
 
@@ -37,9 +37,9 @@ namespace sts::sm {
             virtual void AtmosphereGetRecordSize(Out<u64> record_size);
         public:
             DEFINE_SERVICE_DISPATCH_TABLE {
-                MakeServiceCommandMeta<CommandId::AtmosphereGetRecord, &DmntService::AtmosphereGetRecord>(),
-                MakeServiceCommandMeta<CommandId::AtmosphereListRecords, &DmntService::AtmosphereListRecords>(),
-                MakeServiceCommandMeta<CommandId::AtmosphereGetRecordSize, &DmntService::AtmosphereGetRecordSize>(),
+                MAKE_SERVICE_COMMAND_META(DmntService, AtmosphereGetRecord),
+                MAKE_SERVICE_COMMAND_META(DmntService, AtmosphereListRecords),
+                MAKE_SERVICE_COMMAND_META(DmntService, AtmosphereGetRecordSize),
             };
     };
 

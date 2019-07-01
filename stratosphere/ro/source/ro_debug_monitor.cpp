@@ -14,16 +14,20 @@
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include <climits>
 #include <switch.h>
 #include <stratosphere.hpp>
-#include <climits>
 
 #include "ro_debug_monitor.hpp"
-#include "ro_registration.hpp"
+#include "impl/ro_service_impl.hpp"
 
-Result DebugMonitorService::GetProcessModuleInfo(Out<u32> count, OutBuffer<LoaderModuleInfo> out_infos, u64 pid) {
-    if (out_infos.num_elements > INT_MAX) {
-        return ResultRoInvalidSize;
+namespace sts::ro {
+
+    Result DebugMonitorService::GetProcessModuleInfo(Out<u32> count, OutBuffer<LoaderModuleInfo> out_infos, u64 pid) {
+        if (out_infos.num_elements > INT_MAX) {
+            return ResultRoInvalidSize;
+        }
+        return impl::GetProcessModuleInfo(count.GetPointer(), out_infos.buffer, out_infos.num_elements, pid);
     }
-    return Registration::GetProcessModuleInfo(count.GetPointer(), out_infos.buffer, out_infos.num_elements, pid);
+
 }

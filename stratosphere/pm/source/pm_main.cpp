@@ -22,6 +22,7 @@
 #include <switch.h>
 #include <atmosphere.h>
 #include <stratosphere.hpp>
+#include <stratosphere/sm/sm_manager_api.hpp>
 
 #include "pm_boot_mode.hpp"
 #include "pm_info.hpp"
@@ -35,7 +36,7 @@ extern "C" {
 
     u32 __nx_applet_type = AppletType_None;
 
-    #define INNER_HEAP_SIZE 0x30000
+    #define INNER_HEAP_SIZE 0x40000
     size_t nx_inner_heap_size = INNER_HEAP_SIZE;
     char   nx_inner_heap[INNER_HEAP_SIZE];
 
@@ -104,13 +105,9 @@ void __appInit(void) {
         RegisterPrivilegedProcessesWithFs();
 
         /* Use AMS manager extension to tell SM that FS has been worked around. */
-        {
-            R_ASSERT(smManagerAmsInitialize());
-            smManagerAmsEndInitialDefers();
-            smManagerAmsExit();
-        }
-
         R_ASSERT(smManagerInitialize());
+        R_ASSERT(sts::sm::manager::EndInitialDefers());
+
         R_ASSERT(lrInitialize());
         R_ASSERT(ldrPmInitialize());
         R_ASSERT(splInitialize());
@@ -145,10 +142,15 @@ int main(int argc, char **argv)
     static auto s_server_manager = WaitableManager(1);
 
     /* TODO: Create services. */
-    s_server_manager.AddWaitable(new ServiceServer<ShellService>("pm:shell", 3));
-    s_server_manager.AddWaitable(new ServiceServer<DebugMonitorService>("pm:dmnt", 3));
+    if (GetRuntimeFirmwareVersion() <= FirmwareVersion_400) {
+        s_server_manager.AddWaitable(new ServiceServer<ShellServiceDeprecated>("pm:shell", 3));
+        s_server_manager.AddWaitable(new ServiceServer<DebugMonitorServiceDeprecated>("pm:dmnt", 3));
+    } else {
+        s_server_manager.AddWaitable(new ServiceServer<ShellService>("pm:shell", 3));
+        s_server_manager.AddWaitable(new ServiceServer<DebugMonitorService>("pm:dmnt", 3));
+    }
     s_server_manager.AddWaitable(new ServiceServer<BootModeService>("pm:bm", 6));
-    s_server_manager.AddWaitable(new ServiceServer<InformationService>("pm:info", 3));
+    s_server_manager.AddWaitable(new ServiceServer<InformationService>("pm:info", 19));
 
     /* Loop forever, servicing our services. */
     s_server_manager.Process();

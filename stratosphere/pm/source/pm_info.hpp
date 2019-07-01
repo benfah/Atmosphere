@@ -18,16 +18,24 @@
 #include <switch.h>
 #include <stratosphere.hpp>
 
-enum InformationCmd {
-    Information_Cmd_GetTitleId = 0,
-};
-
 class InformationService final : public IServiceObject {
+    private:
+        enum class CommandId {
+            GetTitleId                 = 0,
+            AtmosphereGetProcessId     = 65000,
+            AtmosphereHasLaunchedTitle = 65001,
+        };
     private:
         /* Actual commands. */
         Result GetTitleId(Out<u64> tid, u64 pid);
+
+        /* Atmosphere commands. */
+        Result AtmosphereGetProcessId(Out<u64> pid, u64 tid);
+        Result AtmosphereHasLaunchedTitle(Out<bool> out, u64 tid);
     public:
         DEFINE_SERVICE_DISPATCH_TABLE {
-            MakeServiceCommandMeta<Information_Cmd_GetTitleId, &InformationService::GetTitleId>(),
+            MAKE_SERVICE_COMMAND_META(InformationService, GetTitleId),
+            MAKE_SERVICE_COMMAND_META(InformationService, AtmosphereGetProcessId),
+            MAKE_SERVICE_COMMAND_META(InformationService, AtmosphereHasLaunchedTitle),
         };
 };

@@ -23,15 +23,16 @@
 
 #include <switch.h>
 #include <stratosphere.hpp>
+#include <stratosphere/sm/sm_manager_api.hpp>
+
 #include "pm_boot2.hpp"
 #include "pm_registration.hpp"
 #include "pm_boot_mode.hpp"
 
-static std::vector<u64> g_launched_titles;
 
 static bool IsHexadecimal(const char *str) {
     while (*str) {
-        if (isxdigit(*str)) {
+        if (isxdigit((unsigned char)*str)) {
             str++;
         } else {
             return false;
@@ -40,23 +41,11 @@ static bool IsHexadecimal(const char *str) {
     return true;
 }
 
-static bool HasLaunchedTitle(u64 title_id) {
-    return std::find(g_launched_titles.begin(), g_launched_titles.end(), title_id) != g_launched_titles.end();
-}
-
-static void SetLaunchedTitle(u64 title_id) {
-    g_launched_titles.push_back(title_id);
-}
-
-static void ClearLaunchedTitles() {
-    g_launched_titles.clear();
-}
-
 static void LaunchTitle(u64 title_id, FsStorageId storage_id, u32 launch_flags, u64 *pid) {
     u64 local_pid = 0;
 
     /* Don't launch a title twice during boot2. */
-    if (HasLaunchedTitle(title_id)) {
+    if (Registration::HasLaunchedTitle(title_id)) {
         return;
     }
 
@@ -78,8 +67,6 @@ static void LaunchTitle(u64 title_id, FsStorageId storage_id, u32 launch_flags, 
     if (pid) {
         *pid = local_pid;
     }
-
-    SetLaunchedTitle(title_id);
 }
 
 static bool GetGpioPadLow(GpioPadName pad) {
@@ -181,27 +168,21 @@ static void MountSdCard() {
 }
 
 static void WaitForMitm(const char *service) {
-    bool mitm_installed = false;
+    const auto name = sts::sm::ServiceName::Encode(service);
 
-    DoWithSmSession([&]() {
-        R_ASSERT(smManagerAmsInitialize());
-    });
-    ON_SCOPE_EXIT { smManagerAmsExit(); };
-
-    while (!mitm_installed) {
-        R_ASSERT(smManagerAmsHasMitm(&mitm_installed, service));
-        if (!mitm_installed) {
-            svcSleepThread(1000000ull);
+    while (true) {
+        bool mitm_installed = false;
+        R_ASSERT(sts::sm::manager::HasMitm(&mitm_installed, name));
+        if (mitm_installed) {
+            break;
         }
+        svcSleepThread(1000000ull);
     }
 }
 
 void EmbeddedBoot2::Main() {
     /* Wait until fs.mitm has installed itself. We want this to happen as early as possible. */
     WaitForMitm("fsp-srv");
-
-    /* Clear titles. */
-    ClearLaunchedTitles();
 
     /* psc, bus, pcv is the minimal set of required titles to get SD card. */
     /* bus depends on pcie, and pcv depends on settings. */
@@ -261,7 +242,7 @@ void EmbeddedBoot2::Main() {
         while ((ent = readdir(titles_dir)) != NULL) {
             if (strlen(ent->d_name) == 0x10 && IsHexadecimal(ent->d_name)) {
                 u64 title_id = (u64)strtoul(ent->d_name, NULL, 16);
-                if (HasLaunchedTitle(title_id)) {
+                if (Registration::HasLaunchedTitle(title_id)) {
                     continue;
                 }
                 char title_path[FS_MAX_PATH] = {0};
@@ -291,7 +272,4 @@ void EmbeddedBoot2::Main() {
 
     /* We no longer need the SD card. */
     fsdevUnmountAll();
-
-    /* Free the memory used to track what boot2 launches. */
-    ClearLaunchedTitles();
 }
