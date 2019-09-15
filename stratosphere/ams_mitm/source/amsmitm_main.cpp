@@ -43,9 +43,10 @@ extern "C" {
     alignas(16) u8 __nx_exception_stack[0x1000];
     u64 __nx_exception_stack_size = sizeof(__nx_exception_stack);
     void __libnx_exception_handler(ThreadExceptionDump *ctx);
-    u64 __stratosphere_title_id = 0x010041544D530000ul;
     void __libstratosphere_exception_handler(AtmosphereFatalErrorContext *ctx);
 }
+
+sts::ncm::TitleId __stratosphere_title_id = sts::ncm::TitleId::AtmosphereMitm;
 
 void __libnx_exception_handler(ThreadExceptionDump *ctx) {
     StratosphereCrashHandler(ctx);
@@ -75,6 +76,7 @@ void __appInit(void) {
         R_ASSERT(fsInitialize());
         R_ASSERT(pmdmntInitialize());
         R_ASSERT(pminfoInitialize());
+        R_ASSERT(splFsInitialize());
     });
 
     CheckAtmosphereVersion(CURRENT_ATMOSPHERE_VERSION);
@@ -82,6 +84,9 @@ void __appInit(void) {
 
 void __appExit(void) {
     /* Cleanup services. */
+    splFsExit();
+    pminfoExit();
+    pmdmntExit();
     fsExit();
 }
 

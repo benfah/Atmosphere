@@ -67,15 +67,15 @@ class NsWebMitmService : public IMitmServiceObject {
             GetDocumentInterface = 7999,
         };
     public:
-        NsWebMitmService(std::shared_ptr<Service> s, u64 pid) : IMitmServiceObject(s, pid) {
+        NsWebMitmService(std::shared_ptr<Service> s, u64 pid, sts::ncm::TitleId tid) : IMitmServiceObject(s, pid, tid) {
             /* ... */
         }
 
-        static bool ShouldMitm(u64 pid, u64 tid) {
+        static bool ShouldMitm(u64 pid, sts::ncm::TitleId tid) {
             /* We will mitm:
              * - web applets, to facilitate hbl web browser launching.
              */
-            return Utils::IsWebAppletTid(tid);
+            return Utils::IsWebAppletTid(static_cast<u64>(tid));
         }
 
         static void PostProcess(IMitmServiceObject *obj, IpcResponseContext *ctx);

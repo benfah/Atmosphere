@@ -298,7 +298,7 @@ bool DmntCheatManager::ParseCheats(const char *s, size_t len) {
     g_needs_reload_vm_program = true;
 
     while (i < len) {
-        if (isspace(s[i])) {
+        if (isspace((unsigned char)s[i])) {
             /* Just ignore space. */
             i++;
         } else if (s[i] == '[') {
@@ -356,7 +356,7 @@ bool DmntCheatManager::ParseCheats(const char *s, size_t len) {
             }
 
             /* Bounds check the opcode count. */
-            if (cur_entry->definition.num_opcodes >= sizeof(cur_entry->definition.opcodes)/sizeof(cur_entry->definition.opcodes[0])) {
+            if (cur_entry->definition.num_opcodes >= sts::util::size(cur_entry->definition.opcodes)) {
                 return false;
             }
 
@@ -445,7 +445,7 @@ bool DmntCheatManager::ParseCheatToggles(const char *s, size_t len) {
     char toggle[8];
 
     while (i < len) {
-        if (isspace(s[i])) {
+        if (isspace((unsigned char)s[i])) {
             /* Just ignore space. */
             i++;
         } else if (s[i] == '[') {
@@ -468,13 +468,13 @@ bool DmntCheatManager::ParseCheatToggles(const char *s, size_t len) {
             i = j + 1;
 
             /* Skip whitespace. */
-            while (isspace(s[i])) {
+            while (isspace((unsigned char)s[i])) {
                 i++;
             }
 
             /* Parse whether to toggle. */
             j = i + 1;
-            while (!isspace(s[j])) {
+            while (!isspace((unsigned char)s[j])) {
                 j++;
                 if (j >= len || (j - i) >= sizeof(toggle)) {
                     return false;
@@ -662,7 +662,7 @@ Result DmntCheatManager::AddCheat(u32 *out_id, CheatDefinition *def, bool enable
         return ResultDmntCheatNotAttached;
     }
 
-    if (def->num_opcodes == 0 || def->num_opcodes > sizeof(def->opcodes)/sizeof(def->opcodes[0])) {
+    if (def->num_opcodes == 0 || def->num_opcodes > sts::util::size(def->opcodes)) {
         return ResultDmntCheatInvalidCheat;
     }
 
@@ -860,7 +860,7 @@ Result DmntCheatManager::ForceOpenCheatProcess() {
     {
         LoaderModuleInfo proc_modules[2];
         u32 num_modules;
-        R_TRY(ldrDmntGetModuleInfos(g_cheat_process_metadata.process_id, proc_modules, sizeof(proc_modules)/sizeof(proc_modules[0]), &num_modules));
+        R_TRY(ldrDmntGetModuleInfos(g_cheat_process_metadata.process_id, proc_modules, sts::util::size(proc_modules), &num_modules));
 
         /* All applications must have two modules. */
         /* However, this is a force-open, so we will accept one module. */
@@ -949,7 +949,7 @@ void DmntCheatManager::OnNewApplicationLaunch() {
     {
         LoaderModuleInfo proc_modules[2];
         u32 num_modules;
-        R_ASSERT(ldrDmntGetModuleInfos(g_cheat_process_metadata.process_id, proc_modules, sizeof(proc_modules)/sizeof(proc_modules[0]), &num_modules));
+        R_ASSERT(ldrDmntGetModuleInfos(g_cheat_process_metadata.process_id, proc_modules, sts::util::size(proc_modules), &num_modules));
 
         /* All applications must have two modules. */
         /* If we only have one, we must be e.g. mitming HBL. */

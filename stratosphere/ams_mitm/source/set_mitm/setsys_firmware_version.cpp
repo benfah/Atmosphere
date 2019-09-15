@@ -32,7 +32,7 @@ void VersionManager::Initialize() {
     }
 
     /* Mount firmware version data archive. */
-    R_ASSERT(romfsMountFromDataArchive(TitleId_ArchiveSystemVersion, FsStorageId_NandSystem, "sysver"));
+    R_ASSERT(romfsMountFromDataArchive(static_cast<u64>(sts::ncm::TitleId::ArchiveSystemVersion), FsStorageId_NandSystem, "sysver"));
     {
         ON_SCOPE_EXIT { romfsUnmount("sysver"); };
 
@@ -58,22 +58,23 @@ void VersionManager::Initialize() {
     /* Modify the output firmware version. */
     {
         u32 major, minor, micro;
-        char display_version[sizeof(g_ams_fw_version.display_version)] = {0};
-
         GetAtmosphereApiVersion(&major, &minor, &micro, nullptr, nullptr);
-        snprintf(display_version, sizeof(display_version), "%s (AMS %u.%u.%u)", g_ams_fw_version.display_version, major, minor, micro);
-
-        memcpy(g_ams_fw_version.display_version, display_version, sizeof(g_ams_fw_version.display_version));
+        const char emummc_char = IsEmummc() ? 'E' : 'S';
+        {
+            char display_version[sizeof(g_ams_fw_version.display_version)] = {0};
+            std::snprintf(display_version, sizeof(display_version), "%s|AMS %u.%u.%u|%c", g_ams_fw_version.display_version, major, minor, micro, emummc_char);
+            std::memcpy(g_ams_fw_version.display_version, display_version, sizeof(g_ams_fw_version.display_version));
+        }
     }
 
     g_got_version = true;
 }
 
-Result VersionManager::GetFirmwareVersion(u64 title_id, SetSysFirmwareVersion *out) {
+Result VersionManager::GetFirmwareVersion(sts::ncm::TitleId title_id, SetSysFirmwareVersion *out) {
     VersionManager::Initialize();
 
     /* Report atmosphere string to qlaunch, maintenance and nothing else. */
-    if (title_id == TitleId_AppletQlaunch || title_id == TitleId_AppletMaintenanceMenu) {
+    if (title_id == sts::ncm::TitleId::AppletQlaunch || title_id == sts::ncm::TitleId::AppletMaintenanceMenu) {
         *out = g_ams_fw_version;
     } else {
         *out = g_fw_version;

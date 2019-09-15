@@ -21,9 +21,9 @@
 #include <malloc.h>
 
 #include <switch.h>
-#include <stratosphere/firmware_version.hpp>
-
+#include <stratosphere.hpp>
 #include "creport_crash_report.hpp"
+#include "creport_utils.hpp"
 
 
 extern "C" {
@@ -43,9 +43,10 @@ extern "C" {
     alignas(16) u8 __nx_exception_stack[0x1000];
     u64 __nx_exception_stack_size = sizeof(__nx_exception_stack);
     void __libnx_exception_handler(ThreadExceptionDump *ctx);
-    u64 __stratosphere_title_id = TitleId_Creport;
     void __libstratosphere_exception_handler(AtmosphereFatalErrorContext *ctx);
 }
+
+sts::ncm::TitleId __stratosphere_title_id = sts::ncm::TitleId::Creport;
 
 void __libnx_exception_handler(ThreadExceptionDump *ctx) {
     StratosphereCrashHandler(ctx);
@@ -80,65 +81,55 @@ void __appExit(void) {
     fsExit();
 }
 
-static u64 creport_parse_u64(char *s) {
-    /* Official creport uses this custom parsing logic... */
-    u64 out_val = 0;
-    for (unsigned int i = 0; i < 20 && s[i]; i++) {
-        if ('0' <= s[i] && s[i] <= '9') {
-            out_val *= 10;
-            out_val += (s[i] - '0');
-        } else {
-            break;
-        }
-    }
-    return out_val;
-}
-
-static CrashReport g_Creport;
+static sts::creport::CrashReport g_Creport;
 
 int main(int argc, char **argv) {
     /* Validate arguments. */
     if (argc < 2) {
-        return 0;
+        return EXIT_FAILURE;
     }
     for (int i = 0; i < argc; i++) {
         if (argv[i] == NULL) {
-            return 0;
+            return EXIT_FAILURE;
         }
     }
 
     /* Parse crashed PID. */
-    u64 crashed_pid = creport_parse_u64(argv[0]);
+    u64 crashed_pid = sts::creport::ParseProcessIdArgument(argv[0]);
 
     /* Try to debug the crashed process. */
     g_Creport.BuildReport(crashed_pid, argv[1][0] == '1');
-    if (g_Creport.WasSuccessful()) {
-        g_Creport.SaveReport();
-
-        DoWithSmSession([&]() {
-            if (R_SUCCEEDED(nsdevInitialize())) {
-                nsdevTerminateProcess(crashed_pid);
-                nsdevExit();
-            }
-        });
-
-        /* Don't fatal if we have extra info. */
-        if ((GetRuntimeFirmwareVersion() >= FirmwareVersion_500)) {
-            if (g_Creport.IsApplication()) {
-                return 0;
-            }
-        } else if (argv[1][0] == '1') {
-            return 0;
-        }
-
-        /* Also don't fatal if we're a user break. */
-        if (g_Creport.IsUserBreak()) {
-            return 0;
-        }
-
-        FatalContext *ctx = g_Creport.GetFatalContext();
-
-        fatalWithContext(g_Creport.GetResult(), FatalType_ErrorScreen, ctx);
+    if (!g_Creport.IsComplete()) {
+        return EXIT_FAILURE;
     }
 
+    /* Save report to file. */
+    g_Creport.SaveReport();
+
+    /* Try to terminate the process. */
+    {
+        sts::sm::ScopedServiceHolder<nsdevInitialize, nsdevExit> ns_holder;
+        if (ns_holder) {
+            nsdevTerminateProcess(crashed_pid);
+        }
+    }
+
+    /* Don't fatal if we have extra info, or if we're 5.0.0+ and an application crashed. */
+    if (GetRuntimeFirmwareVersion() >= FirmwareVersion_500) {
+        if (g_Creport.IsApplication()) {
+            return EXIT_SUCCESS;
+        }
+    } else if (argv[1][0] == '1') {
+        return EXIT_SUCCESS;
+    }
+
+    /* Also don't fatal if we're a user break. */
+    if (g_Creport.IsUserBreak()) {
+        return EXIT_SUCCESS;
+    }
+
+    /* Throw fatal error. */
+    FatalContext ctx;
+    g_Creport.GetFatalContext(&ctx);
+    fatalWithContext(g_Creport.GetResult(), FatalType_ErrorScreen, &ctx);
 }

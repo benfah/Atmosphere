@@ -13,7 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program.  If not, see <http://www.gnu.org/licenses/>.
  */
- 
+
 #include <stdint.h>
 #include <stdbool.h>
 
@@ -64,7 +64,7 @@ void setup_dram_magic_numbers(void) {
 void bootup_misc_mmio(void) {
     /* Initialize Fuse registers. */
     fuse_init();
-    
+
     /* Verify Security Engine sanity. */
     se_set_in_context_save_mode(false);
     /* TODO: se_verify_keys_unreadable(); */
@@ -84,6 +84,9 @@ void bootup_misc_mmio(void) {
     if (!g_has_booted_up && (ATMOSPHERE_TARGET_FIRMWARE_600 > exosphere_get_target_firmware())) {
         setup_dram_magic_numbers();
     }
+
+    /* On 9.0.0+, Nintendo writes random values to context save scratch here, and locks the SRK scratch. */
+    /* There's no real need for us to do this, so we won't. */
 
     /* Mark TMR5, TMR6, TMR7, TMR8, WDT0, WDT1, WDT2 and WDT3 as secure. */
     SHARED_TIMER_SECURE_CFG_0 = 0xF1E0;
@@ -111,7 +114,7 @@ void bootup_misc_mmio(void) {
     MAKE_MC_REG(MC_SECURITY_CFG1) = 0;
     MAKE_MC_REG(MC_SECURITY_CFG3) = 3;
     configure_default_carveouts();
-        
+
     /* Mark registers secure world only. */
     if (exosphere_get_target_firmware() == ATMOSPHERE_TARGET_FIRMWARE_100) {
         APB_MISC_SECURE_REGS_APB_SLAVE_SECURITY_ENABLE_REG0_0 = APB_SSER0_SATA_AUX | APB_SSER0_DTV | APB_SSER0_QSPI | APB_SSER0_SATA | APB_SSER0_LA;
@@ -140,28 +143,26 @@ void bootup_misc_mmio(void) {
         APB_MISC_SECURE_REGS_APB_SLAVE_SECURITY_ENABLE_REG2_0 = sec_disable_2;
     }
 
-    /* Reset Translation Enable Registers. */
+    /* Reset Translation Enable registers. */
     MAKE_MC_REG(MC_SMMU_TRANSLATION_ENABLE_0) = 0xFFFFFFFF;
     MAKE_MC_REG(MC_SMMU_TRANSLATION_ENABLE_1) = 0xFFFFFFFF;
     MAKE_MC_REG(MC_SMMU_TRANSLATION_ENABLE_2) = 0xFFFFFFFF;
     MAKE_MC_REG(MC_SMMU_TRANSLATION_ENABLE_3) = 0xFFFFFFFF;
     MAKE_MC_REG(MC_SMMU_TRANSLATION_ENABLE_4) = 0xFFFFFFFF;
 
-    /* TODO: What are these MC reg writes? */
+    /* Set SMMU ASID security registers. */
     if (exosphere_get_target_firmware() >= ATMOSPHERE_TARGET_FIRMWARE_400) {
-        MAKE_MC_REG(0x038) = 0xE;
+        MAKE_MC_REG(MC_SMMU_ASID_SECURITY) = 0xE;
     } else {
-        MAKE_MC_REG(0x038) = 0x0;
+        MAKE_MC_REG(MC_SMMU_ASID_SECURITY) = 0x0;
     }
-    MAKE_MC_REG(0x03C) = 0;
-
-    /* MISC registers. */
-    MAKE_MC_REG(0x9E0) = 0;
-    MAKE_MC_REG(0x9E4) = 0;
-    MAKE_MC_REG(0x9E8) = 0;
-    MAKE_MC_REG(0x9EC) = 0;
-    MAKE_MC_REG(0x9F0) = 0;
-    MAKE_MC_REG(0x9F4) = 0;
+    MAKE_MC_REG(MC_SMMU_ASID_SECURITY_1) = 0;
+    MAKE_MC_REG(MC_SMMU_ASID_SECURITY_2) = 0;
+    MAKE_MC_REG(MC_SMMU_ASID_SECURITY_3) = 0;
+    MAKE_MC_REG(MC_SMMU_ASID_SECURITY_4) = 0;
+    MAKE_MC_REG(MC_SMMU_ASID_SECURITY_5) = 0;
+    MAKE_MC_REG(MC_SMMU_ASID_SECURITY_6) = 0;
+    MAKE_MC_REG(MC_SMMU_ASID_SECURITY_7) = 0;
 
     if (exosphere_get_target_firmware() >= ATMOSPHERE_TARGET_FIRMWARE_400) {
         MAKE_MC_REG(MC_SMMU_PTB_ASID) = 0;
@@ -176,7 +177,7 @@ void bootup_misc_mmio(void) {
     (void)MAKE_MC_REG(MC_SMMU_TLB_CONFIG);
     MAKE_MC_REG(MC_SMMU_CONFIG) = 1;        /* Enable SMMU. */
     (void)MAKE_MC_REG(MC_SMMU_TLB_CONFIG);
-    
+
     /* Clear RESET Vector, setup CPU Secure Boot RESET Vectors. */
     uint32_t reset_vec;
     if (exosphere_get_target_firmware() >= ATMOSPHERE_TARGET_FIRMWARE_500) {
@@ -204,7 +205,7 @@ void bootup_misc_mmio(void) {
     intr_set_enabled(INTERRUPT_ID_SECURITY_ENGINE, 1);
     intr_set_cpu_mask(INTERRUPT_ID_SECURITY_ENGINE, 8);
     intr_set_edge_level(INTERRUPT_ID_SECURITY_ENGINE, 0);
-    
+
     if (exosphere_get_target_firmware() >= ATMOSPHERE_TARGET_FIRMWARE_400) {
         intr_set_priority(INTERRUPT_ID_ACTIVITY_MONITOR_4X, 0);
         intr_set_group(INTERRUPT_ID_ACTIVITY_MONITOR_4X, 0);
@@ -215,10 +216,10 @@ void bootup_misc_mmio(void) {
 
     if (!g_has_booted_up) {
         /* N doesn't do this, but we should for compatibility. */
-        uart_select(UART_A);
+        uart_config(UART_A);
         clkrst_reboot(CARDEVICE_UARTA);
         uart_init(UART_A, 115200);
-        
+
         intr_register_handler(INTERRUPT_ID_SECURITY_ENGINE, se_operation_completed);
         if (exosphere_get_target_firmware() >= ATMOSPHERE_TARGET_FIRMWARE_400) {
             intr_register_handler(INTERRUPT_ID_ACTIVITY_MONITOR_4X, actmon_interrupt_handler);

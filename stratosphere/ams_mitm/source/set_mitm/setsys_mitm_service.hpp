@@ -33,11 +33,11 @@ class SetSysMitmService : public IMitmServiceObject {
             GetEdid = 41,
         };
     public:
-        SetSysMitmService(std::shared_ptr<Service> s, u64 pid) : IMitmServiceObject(s, pid) {
+        SetSysMitmService(std::shared_ptr<Service> s, u64 pid, sts::ncm::TitleId tid) : IMitmServiceObject(s, pid, tid) {
             /* ... */
         }
 
-        static bool ShouldMitm(u64 pid, u64 tid) {
+        static bool ShouldMitm(u64 pid, sts::ncm::TitleId tid) {
             /* Mitm everything. */
             return true;
         }

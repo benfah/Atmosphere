@@ -44,7 +44,7 @@ bool SetMitmService::IsValidLanguageCode(u64 lang_code) {
         LanguageCode_SimplifiedChinese,
         LanguageCode_TraditionalChinese,
     };
-    size_t num_language_codes = sizeof(s_valid_language_codes) / sizeof(s_valid_language_codes[0]);
+    size_t num_language_codes = sts::util::size(s_valid_language_codes);
     if (GetRuntimeFirmwareVersion() < FirmwareVersion_400) {
         /* 4.0.0 added simplified and traditional chinese. */
         num_language_codes -= 2;
@@ -68,14 +68,14 @@ Result SetMitmService::EnsureLocale() {
 
     if (!this->got_locale) {
         std::memset(&this->locale, 0xCC, sizeof(this->locale));
-        if (this->title_id == TitleId_Ns) {
+        if (this->title_id == sts::ncm::TitleId::Ns) {
             u64 app_pid = 0;
             u64 app_tid = 0;
             R_TRY(pmdmntGetApplicationPid(&app_pid));
             R_TRY(pminfoGetTitleId(&app_tid, app_pid));
             this->locale = Utils::GetTitleOverrideLocale(app_tid);
         } else {
-            this->locale = Utils::GetTitleOverrideLocale(this->title_id);
+            this->locale = Utils::GetTitleOverrideLocale(static_cast<u64>(this->title_id));
             this->got_locale = true;
         }
     }

@@ -51,9 +51,10 @@ extern "C" {
     alignas(16) u8 __nx_exception_stack[0x1000];
     u64 __nx_exception_stack_size = sizeof(__nx_exception_stack);
     void __libnx_exception_handler(ThreadExceptionDump *ctx);
-    u64 __stratosphere_title_id = TitleId_Spl;
     void __libstratosphere_exception_handler(AtmosphereFatalErrorContext *ctx);
 }
+
+sts::ncm::TitleId __stratosphere_title_id = sts::ncm::TitleId::Spl;
 
 void __libnx_exception_handler(ThreadExceptionDump *ctx) {
     StratosphereCrashHandler(ctx);
@@ -103,7 +104,7 @@ int main(int argc, char **argv)
         s_server_manager.AddWaitable(new ServiceServer<sts::spl::CryptoService>("spl:mig", 6));
         s_server_manager.AddWaitable(new ServiceServer<sts::spl::SslService>("spl:ssl", 2));
         s_server_manager.AddWaitable(new ServiceServer<sts::spl::EsService>("spl:es", 2));
-        s_server_manager.AddWaitable(new ServiceServer<sts::spl::FsService>("spl:fs", 2));
+        s_server_manager.AddWaitable(new ServiceServer<sts::spl::FsService>("spl:fs", 3));
         if (GetRuntimeFirmwareVersion() >= FirmwareVersion_500) {
             s_server_manager.AddWaitable(new ServiceServer<sts::spl::ManuService>("spl:manu", 1));
         }

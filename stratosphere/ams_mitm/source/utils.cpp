@@ -16,6 +16,7 @@
 
 #include <switch.h>
 #include <stratosphere.hpp>
+#include <stratosphere/spl.hpp>
 #include <atomic>
 #include <algorithm>
 #include <strings.h>
@@ -28,7 +29,7 @@
 #include "bpc_mitm/bpcmitm_reboot_manager.hpp"
 
 static FsFileSystem g_sd_filesystem = {0};
-static HosSignal g_sd_signal;
+static HosSignal g_sd_signal, g_hid_signal;
 
 static std::vector<u64> g_mitm_flagged_tids;
 static std::vector<u64> g_disable_mitm_flagged_tids;
@@ -52,7 +53,7 @@ static HblOverrideConfig g_hbl_override_config = {
         .key_combination = KEY_R,
         .override_by_default = false
     },
-    .title_id = TitleId_AppletPhotoViewer,
+    .title_id = static_cast<u64>(sts::ncm::TitleId::AppletPhotoViewer),
     .override_any_app = true
 };
 
@@ -61,7 +62,8 @@ static char g_config_ini_data[0x800];
 
 /* Backup file for CAL0 partition. */
 static constexpr size_t ProdinfoSize = 0x8000;
-static FsFile g_cal0_file = {0};
+static FsFile g_cal0_file = {};
+static FsFile g_bis_key_file = {};
 static u8 g_cal0_storage_backup[ProdinfoSize];
 static u8 g_cal0_backup[ProdinfoSize];
 
@@ -83,8 +85,8 @@ void Utils::InitializeThreadFunc(void *args) {
     /* Get required services. */
     DoWithSmSession([&]() {
         Handle tmp_hnd = 0;
-        static const char * const required_active_services[] = {"pcv", "gpio", "pinmux", "psc:c"};
-        for (unsigned int i = 0; i < sizeof(required_active_services) / sizeof(required_active_services[0]); i++) {
+        static const char * const required_active_services[] = {"pcv", "gpio", "pinmux", "psc:m"};
+        for (unsigned int i = 0; i < sts::util::size(required_active_services); i++) {
             R_ASSERT(smGetServiceOriginal(&tmp_hnd, smEncodeName(required_active_services[i])));
             svcCloseHandle(tmp_hnd);
         }
@@ -106,40 +108,105 @@ void Utils::InitializeThreadFunc(void *args) {
         char serial_number[0x40] = {0};
         memcpy(serial_number, g_cal0_storage_backup + 0x250, 0x18);
 
+        /* Automatically backup PRODINFO. */
+        {
+            char prodinfo_backup_path[FS_MAX_PATH] = {0};
+            if (strlen(serial_number) > 0) {
+                snprintf(prodinfo_backup_path, sizeof(prodinfo_backup_path) - 1, "/atmosphere/automatic_backups/%s_PRODINFO.bin", serial_number);
+            } else {
+                snprintf(prodinfo_backup_path, sizeof(prodinfo_backup_path) - 1, "/atmosphere/automatic_backups/PRODINFO.bin");
+            }
 
-        char prodinfo_backup_path[FS_MAX_PATH] = {0};
-        if (strlen(serial_number) > 0) {
-            snprintf(prodinfo_backup_path, sizeof(prodinfo_backup_path) - 1, "/atmosphere/automatic_backups/%s_PRODINFO.bin", serial_number);
-        } else {
-            snprintf(prodinfo_backup_path, sizeof(prodinfo_backup_path) - 1, "/atmosphere/automatic_backups/PRODINFO.bin");
+            fsFsCreateFile(&g_sd_filesystem, prodinfo_backup_path, ProdinfoSize, 0);
+            if (R_SUCCEEDED(fsFsOpenFile(&g_sd_filesystem, prodinfo_backup_path, FS_OPEN_READ | FS_OPEN_WRITE, &g_cal0_file))) {
+                bool has_auto_backup = false;
+                size_t read = 0;
+                if (R_SUCCEEDED(fsFileRead(&g_cal0_file, 0, g_cal0_backup, sizeof(g_cal0_backup), FS_READOPTION_NONE, &read)) && read == sizeof(g_cal0_backup)) {
+                    bool is_cal0_valid = true;
+                    is_cal0_valid &= memcmp(g_cal0_backup, "CAL0", 4) == 0;
+                    is_cal0_valid &= memcmp(g_cal0_backup + 0x250, serial_number, 0x18) == 0;
+                    u32 cal0_size = ((u32 *)g_cal0_backup)[2];
+                    is_cal0_valid &= cal0_size + 0x40 <= ProdinfoSize;
+                    if (is_cal0_valid) {
+                        u8 calc_hash[0x20];
+                        sha256CalculateHash(calc_hash, g_cal0_backup + 0x40, cal0_size);
+                        is_cal0_valid &= memcmp(calc_hash, g_cal0_backup + 0x20, sizeof(calc_hash)) == 0;
+                    }
+                    has_auto_backup = is_cal0_valid;
+                }
+
+                if (!has_auto_backup) {
+                    fsFileSetSize(&g_cal0_file, ProdinfoSize);
+                    fsFileWrite(&g_cal0_file, 0, g_cal0_storage_backup, ProdinfoSize, FS_WRITEOPTION_FLUSH);
+                }
+
+                /* NOTE: g_cal0_file is intentionally not closed here. This prevents any other process from opening it. */
+                memset(g_cal0_storage_backup, 0, sizeof(g_cal0_storage_backup));
+                memset(g_cal0_backup, 0, sizeof(g_cal0_backup));
+            }
         }
 
-        fsFsCreateFile(&g_sd_filesystem, prodinfo_backup_path, ProdinfoSize, 0);
-        if (R_SUCCEEDED(fsFsOpenFile(&g_sd_filesystem, prodinfo_backup_path, FS_OPEN_READ | FS_OPEN_WRITE, &g_cal0_file))) {
-            bool has_auto_backup = false;
-            size_t read = 0;
-            if (R_SUCCEEDED(fsFileRead(&g_cal0_file, 0, g_cal0_backup, sizeof(g_cal0_backup), FS_READOPTION_NONE, &read)) && read == sizeof(g_cal0_backup)) {
-                bool is_cal0_valid = true;
-                is_cal0_valid &= memcmp(g_cal0_backup, "CAL0", 4) == 0;
-                is_cal0_valid &= memcmp(g_cal0_backup + 0x250, serial_number, 0x18) == 0;
-                u32 cal0_size = ((u32 *)g_cal0_backup)[2];
-                is_cal0_valid &= cal0_size + 0x40 <= ProdinfoSize;
-                if (is_cal0_valid) {
-                    u8 calc_hash[0x20];
-                    sha256CalculateHash(calc_hash, g_cal0_backup + 0x40, cal0_size);
-                    is_cal0_valid &= memcmp(calc_hash, g_cal0_backup + 0x20, sizeof(calc_hash)) == 0;
+        /* Automatically backup BIS keys. */
+        {
+            u64 key_generation = 0;
+            if (GetRuntimeFirmwareVersion() >= FirmwareVersion_500) {
+                R_ASSERT(splGetConfig(SplConfigItem_NewKeyGeneration, &key_generation));
+            }
+
+            static constexpr u8 const BisKeySources[4][2][0x10] = {
+                {
+                    {0xF8, 0x3F, 0x38, 0x6E, 0x2C, 0xD2, 0xCA, 0x32, 0xA8, 0x9A, 0xB9, 0xAA, 0x29, 0xBF, 0xC7, 0x48},
+                    {0x7D, 0x92, 0xB0, 0x3A, 0xA8, 0xBF, 0xDE, 0xE1, 0xA7, 0x4C, 0x3B, 0x6E, 0x35, 0xCB, 0x71, 0x06}
+                },
+                {
+                    {0x41, 0x00, 0x30, 0x49, 0xDD, 0xCC, 0xC0, 0x65, 0x64, 0x7A, 0x7E, 0xB4, 0x1E, 0xED, 0x9C, 0x5F},
+                    {0x44, 0x42, 0x4E, 0xDA, 0xB4, 0x9D, 0xFC, 0xD9, 0x87, 0x77, 0x24, 0x9A, 0xDC, 0x9F, 0x7C, 0xA4}
+                },
+                {
+                    {0x52, 0xC2, 0xE9, 0xEB, 0x09, 0xE3, 0xEE, 0x29, 0x32, 0xA1, 0x0C, 0x1F, 0xB6, 0xA0, 0x92, 0x6C},
+                    {0x4D, 0x12, 0xE1, 0x4B, 0x2A, 0x47, 0x4C, 0x1C, 0x09, 0xCB, 0x03, 0x59, 0xF0, 0x15, 0xF4, 0xE4}
+                },
+                {
+                    {0x52, 0xC2, 0xE9, 0xEB, 0x09, 0xE3, 0xEE, 0x29, 0x32, 0xA1, 0x0C, 0x1F, 0xB6, 0xA0, 0x92, 0x6C},
+                    {0x4D, 0x12, 0xE1, 0x4B, 0x2A, 0x47, 0x4C, 0x1C, 0x09, 0xCB, 0x03, 0x59, 0xF0, 0x15, 0xF4, 0xE4}
                 }
-                has_auto_backup = is_cal0_valid;
+            };
+            u8 bis_keys[4][2][0x10] = {};
+
+            /* TODO: Clean this up in ams_mitm refactor. */
+            for (size_t partition = 0; partition < 4; partition++) {
+                if (partition == 0) {
+                    for (size_t i = 0; i < 2; i++) {
+                        R_ASSERT(splFsGenerateSpecificAesKey(BisKeySources[partition][i], key_generation, i, bis_keys[partition][i]));
+                    }
+                } else {
+                    static constexpr u8 const BisKekSource[0x10] = {
+                        0x34, 0xC1, 0xA0, 0xC4, 0x82, 0x58, 0xF8, 0xB4, 0xFA, 0x9E, 0x5E, 0x6A, 0xDA, 0xFC, 0x7E, 0x4F,
+                    };
+
+                    const u32 option = (partition == 3 && sts::spl::IsRecoveryBoot()) ? 0x4 : 0x1;
+
+                    u8 access_key[0x10];
+                    R_ASSERT(splCryptoGenerateAesKek(BisKekSource, key_generation, option, access_key));
+                    for (size_t i = 0; i < 2; i++) {
+                        R_ASSERT(splCryptoGenerateAesKey(access_key, BisKeySources[partition][i], bis_keys[partition][i]));
+                    }
+                }
             }
 
-            if (!has_auto_backup) {
-                fsFileSetSize(&g_cal0_file, ProdinfoSize);
-                fsFileWrite(&g_cal0_file, 0, g_cal0_storage_backup, ProdinfoSize, FS_WRITEOPTION_FLUSH);
+            char bis_key_backup_path[FS_MAX_PATH] = {0};
+            if (strlen(serial_number) > 0) {
+                snprintf(bis_key_backup_path, sizeof(bis_key_backup_path) - 1, "/atmosphere/automatic_backups/%s_BISKEYS.bin", serial_number);
+            } else {
+                snprintf(bis_key_backup_path, sizeof(bis_key_backup_path) - 1, "/atmosphere/automatic_backups/BISKEYS.bin");
             }
 
-            /* NOTE: g_cal0_file is intentionally not closed here. This prevents any other process from opening it. */
-            memset(g_cal0_storage_backup, 0, sizeof(g_cal0_storage_backup));
-            memset(g_cal0_backup, 0, sizeof(g_cal0_backup));
+            fsFsCreateFile(&g_sd_filesystem, bis_key_backup_path, sizeof(bis_keys), 0);
+            if (R_SUCCEEDED(fsFsOpenFile(&g_sd_filesystem, bis_key_backup_path, FS_OPEN_READ | FS_OPEN_WRITE, &g_bis_key_file))) {
+                fsFileSetSize(&g_bis_key_file, sizeof(bis_keys));
+                fsFileWrite(&g_bis_key_file, 0, bis_keys, sizeof(bis_keys), FS_WRITEOPTION_FLUSH);
+                /* NOTE: g_bis_key_file is intentionally not closed here. This prevents any other process from opening it. */
+            }
         }
     }
 
@@ -232,6 +299,9 @@ void Utils::InitializeThreadFunc(void *args) {
             svcSleepThread(1000000ULL);
         }
     }
+
+    /* Signal to waiters that we are ready. */
+    g_hid_signal.Signal();
 }
 
 bool Utils::IsSdInitialized() {
@@ -244,6 +314,10 @@ void Utils::WaitSdInitialized() {
 
 bool Utils::IsHidAvailable() {
     return g_has_hid_session;
+}
+
+void Utils::WaitHidAvailable() {
+    g_hid_signal.Wait();
 }
 
 Result Utils::OpenSdFile(const char *fn, int flags, FsFile *out) {
@@ -378,12 +452,14 @@ Result Utils::SaveSdFileForAtmosphere(u64 title_id, const char *fn, void *data, 
     return ResultSuccess;
 }
 
-bool Utils::IsHblTid(u64 tid) {
-    return (g_hbl_override_config.override_any_app && TitleIdIsApplication(tid)) || (tid == g_hbl_override_config.title_id);
+bool Utils::IsHblTid(u64 _tid) {
+    const sts::ncm::TitleId tid{_tid};
+    return (g_hbl_override_config.override_any_app && sts::ncm::IsApplicationTitleId(tid)) || (_tid == g_hbl_override_config.title_id);
 }
 
-bool Utils::IsWebAppletTid(u64 tid) {
-    return tid == TitleId_AppletWeb || tid == TitleId_AppletOfflineWeb || tid == TitleId_AppletLoginShare || tid == TitleId_AppletWifiWebAuth;
+bool Utils::IsWebAppletTid(u64 _tid) {
+    const sts::ncm::TitleId tid{_tid};
+    return tid == sts::ncm::TitleId::AppletWeb || tid == sts::ncm::TitleId::AppletOfflineWeb || tid == sts::ncm::TitleId::AppletLoginShare || tid == sts::ncm::TitleId::AppletWifiWebAuth;
 }
 
 bool Utils::HasTitleFlag(u64 tid, const char *flag) {
@@ -472,7 +548,7 @@ static bool HasOverrideKey(OverrideKey *cfg) {
 
 
 bool Utils::HasOverrideButton(u64 tid) {
-    if ((!TitleIdIsApplication(tid)) || (!IsSdInitialized())) {
+    if ((!sts::ncm::IsApplicationTitleId(sts::ncm::TitleId{tid})) || (!IsSdInitialized())) {
         /* Disable button override disable for non-applications. */
         return true;
     }

@@ -48,7 +48,6 @@ static void set_has_rebooted(bool rebooted) {
     MAKE_REG32(0x4003FFFC) = rebooted ? 0xFAFAFAFA : 0x00000000;
 }
 
-
 static void exfiltrate_keys_and_reboot_if_needed(uint32_t version) {
     volatile tegra_pmc_t *pmc = pmc_get_regs();
     uint8_t *enc_se_state = (uint8_t *)0x4003E000;
@@ -91,6 +90,20 @@ static void exfiltrate_keys_and_reboot_if_needed(uint32_t version) {
     }
 }
 
+static void display_splash_screen(void) {
+    /* Draw splash. */
+    draw_splash((volatile uint32_t *)g_framebuffer);
+    
+    /* Turn on the backlight. */
+    display_backlight(true);
+    
+    /* Ensure the splash screen is displayed for at least one second. */
+    mdelay(1000);
+    
+    /* Turn off the backlight. */
+    display_backlight(false);
+}
+
 static void setup_env(void) {
     g_framebuffer = (void *)0xC0000000;
 
@@ -105,14 +118,7 @@ static void setup_env(void) {
 
     /* Set the framebuffer. */
     display_init_framebuffer(g_framebuffer);
-
-    /* Draw splash. */
-    draw_splash((volatile uint32_t *)g_framebuffer);
-
-    /* Turn on the backlight after initializing the lfb */
-    /* to avoid flickering. */
-    display_backlight(true);
-
+    
     /* Set up the exception handlers. */
     setup_exception_handlers();
 
@@ -123,8 +129,8 @@ static void setup_env(void) {
 static void cleanup_env(void) {
     /* Unmount the SD card. */
     unmount_sd();
-
-    display_backlight(false);
+    
+    /* Terminate the display. */
     display_end();
 }
 
@@ -150,7 +156,7 @@ int sept_main(uint32_t version) {
     /* Override the global logging level. */
     log_set_log_level(log_level);
 
-    /* Initialize the display, console, etc. */
+    /* Initialize the boot environment. */
     setup_env();
 
     /* Mark EMC scratch to say that sept has run. */
@@ -158,22 +164,20 @@ int sept_main(uint32_t version) {
 
     /* Load the loader payload into DRAM. */
     load_stage2();
+    
+    /* Display the splash screen. */
+    display_splash_screen();
 
     /* Setup argument data. */
-    log_level = SCREEN_LOG_LEVEL_MANDATORY;
     stage2_path = stage2_get_program_path();
     strcpy(g_chainloader_arg_data, stage2_path);
     stage2_args = (stage2_args_t *)(g_chainloader_arg_data + strlen(stage2_path) + 1); /* May be unaligned. */
     memcpy(&stage2_args->version, &stage2_version, 4);
     memcpy(&stage2_args->log_level, &log_level, sizeof(log_level));
-    stage2_args->display_initialized = false;
     strcpy(stage2_args->bct0, "");
     g_chainloader_argc = 2;
 
-    /* Wait a while. */
-    mdelay(1500);
-
-    /* Deinitialize the display, console, etc. */
+    /* Terminate the boot environment. */
     cleanup_env();
 
     /* Finally, after the cleanup routines (__libc_fini_array, etc.) are called, jump to Stage2. */

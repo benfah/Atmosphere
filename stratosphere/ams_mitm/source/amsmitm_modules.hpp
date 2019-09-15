@@ -21,6 +21,7 @@ enum MitmModuleId : u32 {
     MitmModuleId_SetMitm = 1,
     MitmModuleId_BpcMitm = 2,
     MitmModuleId_NsMitm = 3,
+    MitmModuleId_HidMitm = 4,
 
     /* Always keep this at the end. */
     MitmModuleId_Count,

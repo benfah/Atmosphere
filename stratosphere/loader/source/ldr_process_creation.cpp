@@ -28,51 +28,6 @@
 #include "ldr_process_creation.hpp"
 #include "ldr_ro_manager.hpp"
 
-/* TODO: Move into libstratosphere header? */
-namespace sts::svc {
-
-    namespace {
-
-        enum CreateProcessFlag : u32 {
-            /* Is 64 bit? */
-            CreateProcessFlag_Is64Bit       = (1 << 0),
-
-            /* What kind of address space? */
-            CreateProcessFlag_AddressSpaceShift             = 1,
-            CreateProcessFlag_AddressSpaceMask              = (7 << CreateProcessFlag_AddressSpaceShift),
-            CreateProcessFlag_AddressSpace32Bit             = (ldr::Npdm::AddressSpaceType_32Bit << CreateProcessFlag_AddressSpaceShift),
-            CreateProcessFlag_AddressSpace64BitDeprecated   = (ldr::Npdm::AddressSpaceType_64BitDeprecated << CreateProcessFlag_AddressSpaceShift),
-            CreateProcessFlag_AddressSpace32BitWithoutAlias = (ldr::Npdm::AddressSpaceType_32BitWithoutAlias << CreateProcessFlag_AddressSpaceShift),
-            CreateProcessFlag_AddressSpace64Bit             = (ldr::Npdm::AddressSpaceType_64Bit << CreateProcessFlag_AddressSpaceShift),
-
-            /* Should JIT debug be done on crash? */
-            CreateProcessFlag_EnableDebug   = (1 << 4),
-
-            /* Should ASLR be enabled for the process? */
-            CreateProcessFlag_EnableAslr    = (1 << 5),
-
-            /* Is the process an application? */
-            CreateProcessFlag_IsApplication = (1 << 6),
-
-            /* 4.x deprecated: Should use secure memory? */
-            CreateProcessFlag_DeprecatedUseSecureMemory = (1 << 7),
-
-            /* 5.x+ Pool partition type. */
-            CreateProcessFlag_PoolPartitionShift            = 7,
-            CreateProcessFlag_PoolPartitionMask             = (0xF << CreateProcessFlag_PoolPartitionShift),
-            CreateProcessFlag_PoolPartitionApplication      = (ldr::Acid::PoolPartition_Application << CreateProcessFlag_PoolPartitionShift),
-            CreateProcessFlag_PoolPartitionApplet           = (ldr::Acid::PoolPartition_Applet << CreateProcessFlag_PoolPartitionShift),
-            CreateProcessFlag_PoolPartitionSystem           = (ldr::Acid::PoolPartition_System << CreateProcessFlag_PoolPartitionShift),
-            CreateProcessFlag_PoolPartitionSystemNonSecure  = (ldr::Acid::PoolPartition_SystemNonSecure << CreateProcessFlag_PoolPartitionShift),
-
-            /* 7.x+ Should memory allocation be optimized? This requires IsApplication. */
-            CreateProcessFlag_OptimizeMemoryAllocation = (1 << 11),
-        };
-
-    }
-
-}
-
 namespace sts::ldr {
 
     namespace {
@@ -147,6 +102,136 @@ namespace sts::ldr {
         bool g_has_nso[Nso_Count];
         NsoHeader g_nso_headers[Nso_Count];
 
+        /* Anti-downgrade. */
+        struct MinimumTitleVersion {
+            ncm::TitleId title_id;
+            u32 version;
+        };
+
+        constexpr u32 MakeSystemVersion(u32 major, u32 minor, u32 micro) {
+            return (major << 26) | (minor << 20) | (micro << 16);
+        }
+
+        constexpr MinimumTitleVersion g_MinimumTitleVersions810[] = {
+            {ncm::TitleId::Settings,    1},
+            {ncm::TitleId::Bus,         1},
+            {ncm::TitleId::Audio,       1},
+            {ncm::TitleId::NvServices,  1},
+            {ncm::TitleId::Ns,          1},
+            {ncm::TitleId::Ssl,         1},
+            {ncm::TitleId::Es,          1},
+            {ncm::TitleId::Creport,     1},
+            {ncm::TitleId::Ro,          1},
+        };
+        constexpr size_t g_MinimumTitleVersionsCount810 = util::size(g_MinimumTitleVersions810);
+
+        constexpr MinimumTitleVersion g_MinimumTitleVersions900[] = {
+            /* All non-Development System Modules. */
+            {ncm::TitleId::Usb,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Tma,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Boot2,       MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Settings,    MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Bus,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Bluetooth,   MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Bcat,        MakeSystemVersion(9, 0, 0)},
+         /* {ncm::TitleId::Dmnt,        MakeSystemVersion(9, 0, 0)}, */
+            {ncm::TitleId::Friends,     MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Nifm,        MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Ptm,         MakeSystemVersion(9, 0, 0)},
+         /* {ncm::TitleId::Shell,       MakeSystemVersion(9, 0, 0)}, */
+            {ncm::TitleId::BsdSockets,  MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Hid,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Audio,       MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::LogManager,  MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Wlan,        MakeSystemVersion(9, 0, 0)},
+         /* {ncm::TitleId::Cs,          MakeSystemVersion(9, 0, 0)}, */
+            {ncm::TitleId::Ldn,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::NvServices,  MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Pcv,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Ppc,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::NvnFlinger,  MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Pcie,        MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Account,     MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Ns,          MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Nfc,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Psc,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::CapSrv,      MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Am,          MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Ssl,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Nim,         MakeSystemVersion(9, 0, 0)},
+         /* {ncm::TitleId::Cec,         MakeSystemVersion(9, 0, 0)}, */
+         /* {ncm::TitleId::Tspm,        MakeSystemVersion(9, 0, 0)}, */
+         /* {ncm::TitleId::Spl,         MakeSystemVersion(9, 0, 0)}, */
+            {ncm::TitleId::Lbl,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Btm,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Erpt,        MakeSystemVersion(9, 0, 0)},
+         /* {ncm::TitleId::Time,        MakeSystemVersion(9, 0, 0)}, */
+            {ncm::TitleId::Vi,          MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Pctl,        MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Npns,        MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Eupld,       MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Glue,        MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Eclct,       MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Es,          MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Fatal,       MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Grc,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Creport,     MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Ro,          MakeSystemVersion(9, 0, 0)},
+         /* {ncm::TitleId::Profiler,    MakeSystemVersion(9, 0, 0)}, */
+            {ncm::TitleId::Sdb,         MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Migration,   MakeSystemVersion(9, 0, 0)},
+         /* {ncm::TitleId::Jit,         MakeSystemVersion(9, 0, 0)}, */
+            {ncm::TitleId::JpegDec,     MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::SafeMode,    MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::Olsc,        MakeSystemVersion(9, 0, 0)},
+         /* {ncm::TitleId::Dt,          MakeSystemVersion(9, 0, 0)}, */
+         /* {ncm::TitleId::Nd,          MakeSystemVersion(9, 0, 0)}, */
+            {ncm::TitleId::Ngct,        MakeSystemVersion(9, 0, 0)},
+
+            /* All Web Applets. */
+            {ncm::TitleId::AppletWeb,           MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::AppletShop,          MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::AppletOfflineWeb,    MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::AppletLoginShare,    MakeSystemVersion(9, 0, 0)},
+            {ncm::TitleId::AppletWifiWebAuth,   MakeSystemVersion(9, 0, 0)},
+        };
+        constexpr size_t g_MinimumTitleVersionsCount900 = util::size(g_MinimumTitleVersions900);
+
+        Result ValidateTitleVersion(ncm::TitleId title_id, u32 version) {
+            if (GetRuntimeFirmwareVersion() < FirmwareVersion_810) {
+                return ResultSuccess;
+            } else {
+#ifdef LDR_VALIDATE_PROCESS_VERSION
+                const MinimumTitleVersion *entries = nullptr;
+                size_t num_entries = 0;
+                switch (GetRuntimeFirmwareVersion()) {
+                    case FirmwareVersion_810:
+                        entries = g_MinimumTitleVersions810;
+                        num_entries = g_MinimumTitleVersionsCount810;
+                        break;
+                    case FirmwareVersion_900:
+                        entries = g_MinimumTitleVersions900;
+                        num_entries = g_MinimumTitleVersionsCount900;
+                        break;
+                    default:
+                        entries = nullptr;
+                        num_entries = 0;
+                        break;
+                }
+
+                for (size_t i = 0; i < num_entries; i++) {
+                    if (entries[i].title_id == title_id && entries[i].version > version) {
+                        return ResultLoaderInvalidVersion;
+                    }
+                }
+
+                return ResultSuccess;
+#else
+                return ResultSuccess;
+#endif
+            }
+        }
+
         /* Helpers. */
         Result GetProgramInfoFromMeta(ProgramInfo *out, const Meta *meta) {
             /* Copy basic info. */
@@ -160,7 +245,7 @@ namespace sts::ldr {
 #define COPY_ACCESS_CONTROL(source, which) \
             ({ \
                 const size_t size = meta->source->which##_size; \
-                if (offset + size >= sizeof(out->ac_buffer)) { \
+                if (offset + size > sizeof(out->ac_buffer)) { \
                     return ResultLoaderInternalError; \
                 } \
                 out->source##_##which##_size = size; \
@@ -194,35 +279,6 @@ namespace sts::ldr {
 
         Acid::PoolPartition GetPoolPartition(const Meta *meta) {
             return static_cast<Acid::PoolPartition>((meta->acid->flags & Acid::AcidFlag_PoolPartitionMask) >> Acid::AcidFlag_PoolPartitionShift);
-        }
-
-        constexpr bool IsDisallowedVersion810(const u64 title_id, const u32 version) {
-            return version == 0 &&
-                (title_id == TitleId_Settings ||
-                 title_id == TitleId_Bus ||
-                 title_id == TitleId_Audio ||
-                 title_id == TitleId_NvServices ||
-                 title_id == TitleId_Ns ||
-                 title_id == TitleId_Ssl ||
-                 title_id == TitleId_Es ||
-                 title_id == TitleId_Creport ||
-                 title_id == TitleId_Ro);
-        }
-
-        Result ValidateTitleVersion(ncm::TitleId title_id, u32 version) {
-            if (GetRuntimeFirmwareVersion() < FirmwareVersion_810) {
-                return ResultSuccess;
-            } else {
-#ifdef LDR_VALIDATE_PROCESS_VERSION
-                if (IsDisallowedVersion810(static_cast<u64>(title_id), version)) {
-                    return ResultLoaderInvalidVersion;
-                } else {
-                    return ResultSuccess;
-                }
-#else
-                return ResultSuccess;
-#endif
-            }
         }
 
         Result LoadNsoHeaders(ncm::TitleId title_id, NsoHeader *nso_headers, bool *has_nso) {
@@ -685,9 +741,6 @@ namespace sts::ldr {
                     }
                 }
             }
-
-            /* Inform SM about the title for association purposes. */
-            R_ASSERT(sm::mitm::AssociateProcessIdAndTitleId(process_id, static_cast<u64>(loc.title_id)));
 
             /* If we're overriding for HBL, perform HTML document redirection. */
             if (mount.IsHblMounted()) {

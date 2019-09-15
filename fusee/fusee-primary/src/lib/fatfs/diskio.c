@@ -9,8 +9,10 @@
 
 #include <stdbool.h>
 #include <string.h>
-#include "diskio.h"     /* FatFs lower layer API */
+#include "ff.h"         /* Obtains integer types */
+#include "diskio.h"     /* Declarations of disk functions */
 #include "../../fs_utils.h"
+
 
 /*-----------------------------------------------------------------------*/
 /* Get Drive Status                                                      */
@@ -63,6 +65,8 @@ DRESULT disk_read (
 /* Write Sector(s)                                                       */
 /*-----------------------------------------------------------------------*/
 
+#if FF_FS_READONLY == 0
+
 DRESULT disk_write (
     BYTE pdrv,          /* Physical drive nmuber to identify the drive */
     const BYTE *buff,   /* Data to be written */
@@ -78,6 +82,7 @@ DRESULT disk_write (
     }
 }
 
+#endif
 
 
 /*-----------------------------------------------------------------------*/

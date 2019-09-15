@@ -1,4 +1,46 @@
 # Changelog
+## 0.9.4
++ Support was added for 9.0.0.
+  + **Please note**: 9.0.0 made a number of changes that may cause some issues with homebrew. Details:
+  + 9.0.0 changed HID in a way that causes libnx to be unable to detect button input.
+    + Homebrew should be recompiled with newest libnx to fix this.
+    + Atmosphere now provides a temporary hid-mitm that will cause homebrew to continue to work as expected.
+      + This mitm will be removed in a future Atmosphere revision once homebrew has been updated, to allow users to use a custom hid mitm again if they desire.
+  + 9.0.0 introduced an dependency in FS on the USB system module in order to launch the SD card.
+    + This means the USB system module must now be launched before the SD card is initialized.
+    + Correspondingly, the USB system module can no longer be IPS patched, and its settings cannot be reliably mitm'd.
+    + We know this is frustrating, so we'll be looking into whether there is some way of addressing this in the future.
++ An off-by-one error was fixed in `boot` system module's pinmux initialization.
+  + This could theoretically have caused issues with HdmiCec communication.
+  + No users reported issues, so it's unclear if this was a problem in practice.
++ A bug was fixed that could cause webapplet launching homebrew to improperly set the accessible url whitelist.
++ BIS key generation has been fixed for newer hardware.
+  + Newer hardware uses new, per-firmware device key to generate BIS keys instead of the first device key, so previously the wrong keys were generated as backup.
+  + This only affects units manufactured after ~5.0.0.
++ General system stability improvements to enhance the user's experience.
+## 0.9.3
++ Thanks to hexkyz, fusee's boot sequence has been greatly optimized.
+  + Memory training is now managed by a separate binary (`fusee-mtc`, loaded by fusee-primary before fusee-secondary).
+  + Unnecessarily long splash screen display times were reduced.
+  + The end result is that Atmosphere now boots *significantly* faster. :)
+  + **Note:** This means fusee-primary must be updated for Atmosphere to boot successfully.
++ The version string was adjusted, and now informs users whether or not they are using emummc.
++ Atmosphere now automatically backs up the user's BIS keys on boot.
+  + This should prevent a user from corrupting nand without access to a copy of the keys needed to fix it.
+    + This is especially relevant on ipatched units, where the RCM vulnerability is not an option for addressing bricks.
++ The `pm` system module was rewritten as part of Stratosphere's ongoing refactor.
+  + Support was added for forward-declaring a mitm'd service before a custom user sysmodule is launched.
+    + This should help resolve dependency issues with service registration times.
+  + SM is now informed of every process's title id, including built-in system modules.
++ The `creport` system module was rewritten as part of Stratosphere's ongoing refactor.
+  + creport now dumps up to 0x100 of stack from each thread in the target process.
+  + A few bugs were fixed, including one that caused creport to incorrectly dump process dying messages.
++ Defaults were added to `system_settings.ini` for controlling hbloader's memory usage in applet mode.
+  + These defaults reserve enough memory so that homebrew can launch swkbd while in applet mode.
++ The `fatal` system module was rewritten as part of Stratosphere's ongoing refactor.
+  + Incorrect display output ("2000-0000") has been fixed. Fatal will now correctly show 2162-0002 when this occurs.
+  + A longstanding bug in how fatal manages the displays has been fixed, and official display init behavior is now matched precisely.
++ General system stability improvements to enhance the user's experience.
 ## 0.9.2
 + A number of emummc bugfixes were added (all thanks to @m4xw's hard work). The following is a summary of emummc changes:
   + Support for file-based emummc instances was fixed.

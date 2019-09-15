@@ -17,15 +17,17 @@
 #pragma once
 #include <switch.h>
 #include <stratosphere/sm.hpp>
+#include <stratosphere/ncm.hpp>
 
 namespace sts::sm::impl {
 
     /* Process management. */
-    Result RegisterProcess(u64 pid, const void *acid_sac, size_t acid_sac_size, const void *aci0_sac, size_t aci0_sac_size);
+    Result RegisterProcess(u64 pid, ncm::TitleId tid, const void *acid_sac, size_t acid_sac_size, const void *aci_sac, size_t aci_sac_size);
     Result UnregisterProcess(u64 pid);
 
     /* Service management. */
     Result HasService(bool *out, ServiceName service);
+    Result WaitService(ServiceName service);
     Result GetServiceHandle(Handle *out, u64 pid, ServiceName service);
     Result RegisterService(Handle *out, u64 pid, ServiceName service, size_t max_sessions, bool is_light);
     Result RegisterServiceForSelf(Handle *out, ServiceName service, size_t max_sessions);
@@ -33,10 +35,11 @@ namespace sts::sm::impl {
 
     /* Mitm extensions. */
     Result HasMitm(bool *out, ServiceName service);
+    Result WaitMitm(ServiceName service);
     Result InstallMitm(Handle *out, Handle *out_query, u64 pid, ServiceName service);
     Result UninstallMitm(u64 pid, ServiceName service);
-    Result AcknowledgeMitmSession(u64 *out_pid, Handle *out_hnd, u64 pid, ServiceName service);
-    Result AssociatePidTidForMitm(u64 pid, u64 tid);
+    Result DeclareFutureMitm(u64 pid, ServiceName service);
+    Result AcknowledgeMitmSession(u64 *out_pid, ncm::TitleId *out_tid, Handle *out_hnd, u64 pid, ServiceName service);
 
     /* Dmnt record extensions. */
     Result GetServiceRecord(ServiceRecord *out, ServiceName service);

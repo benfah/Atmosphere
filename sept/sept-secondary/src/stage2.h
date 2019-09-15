@@ -32,12 +32,15 @@
 #define STAGE2_ARGC 2
 
 #define STAGE2_NAME_KEY "stage2_path"
+#define STAGE2_MTC_NAME_KEY "stage2_mtc_path"
 #define STAGE2_ADDRESS_KEY "stage2_addr"
 #define STAGE2_ENTRYPOINT_KEY "stage2_entrypoint"
+
 #define BCTO_MAX_SIZE 0x5800
 
 typedef struct {
     char path[0x100];
+    char mtc_path[0x100];
     uintptr_t load_address;
     uintptr_t entrypoint;
 } stage2_config_t;
@@ -45,9 +48,12 @@ typedef struct {
 typedef struct {
     uint32_t version;
     ScreenLogLevel log_level;
-    bool display_initialized;
     char bct0[BCTO_MAX_SIZE];
 } stage2_args_t;
+
+typedef struct {
+    ScreenLogLevel log_level;
+} stage2_mtc_args_t;
 
 const char *stage2_get_program_path(void);
 void load_stage2(void);
